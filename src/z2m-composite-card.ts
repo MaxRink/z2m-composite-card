@@ -47,7 +47,7 @@ interface Z2mSchema {
 interface Z2mCompositeAttribute {
   property: string;
   set_topic: string;
-  schema_b64: string;
+  schema: Z2mSchema;
   value: CompositeRecord | null;
 }
 
@@ -89,12 +89,6 @@ function stringifyError(error: unknown): string {
     return error.message;
   }
   return String(error);
-}
-
-function decodeBase64Json(value: string): unknown {
-  const binary = atob(value);
-  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-  return JSON.parse(new TextDecoder().decode(bytes));
 }
 
 function validateFeature(value: unknown): Z2mFeature | null {
@@ -463,35 +457,23 @@ export class Z2mCompositeCard extends LitElement {
       };
     }
 
-    if (
-      typeof rawAttribute.property !== 'string' ||
-      typeof rawAttribute.set_topic !== 'string' ||
-      typeof rawAttribute.schema_b64 !== 'string'
-    ) {
+    if (typeof rawAttribute.property !== 'string' || typeof rawAttribute.set_topic !== 'string') {
       return {
         ok: false,
         title: this._config.title ?? 'Zigbee2MQTT Composite Card',
-        message: 'The z2m_composite attribute is missing required property, set_topic, or schema_b64 fields.',
+        message: 'The z2m_composite attribute is missing the required property or set_topic fields.',
       };
     }
 
-    let schema: Z2mSchema | null = null;
-    try {
-      schema = validateSchema(decodeBase64Json(rawAttribute.schema_b64));
-    } catch (error) {
-      return {
-        ok: false,
-        title: this._config.title ?? 'Zigbee2MQTT Composite Card',
-        message: 'The z2m_composite schema could not be decoded.',
-        detail: stringifyError(error),
-      };
-    }
+    // The schema is provided directly as a nested object on the attribute (published by Zigbee2MQTT as
+    // literal JSON in the sensor's json_attributes_template) — no decoding needed.
+    const schema = validateSchema(rawAttribute.schema);
 
     if (!schema) {
       return {
         ok: false,
         title: this._config.title ?? 'Zigbee2MQTT Composite Card',
-        message: 'The decoded Zigbee2MQTT composite schema is invalid.',
+        message: 'The Zigbee2MQTT composite schema is missing or invalid.',
       };
     }
 
@@ -502,7 +484,7 @@ export class Z2mCompositeCard extends LitElement {
       attribute: {
         property: rawAttribute.property,
         set_topic: rawAttribute.set_topic,
-        schema_b64: rawAttribute.schema_b64,
+        schema,
         value: isRecord(rawAttribute.value) ? (rawAttribute.value as CompositeRecord) : null,
       },
       currentValue: isRecord(rawAttribute.value) ? (rawAttribute.value as CompositeRecord) : null,

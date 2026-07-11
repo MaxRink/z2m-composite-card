@@ -58,12 +58,12 @@ The target sensor must expose:
 attributes.z2m_composite = {
   property: "cyclic_timed_irrigation",
   set_topic: "zigbee2mqtt/<device friendly name>/set",
-  schema_b64: "<base64 JSON schema>",
+  schema: { property: "...", label: "...", features: [ /* ... */ ] },
   value: { /* current complete composite object */ }
 }
 ```
 
-The card decodes `schema_b64`, renders fields for numeric, enum, binary, text, composite, and list features, then publishes:
+The card reads `schema` directly, renders fields for numeric, enum, binary, text, composite, and list features, then publishes:
 
 ```js
 {
