@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="Screenshot placeholder">
+  <rect width="960" height="540" fill="#f3f4f6"/>
+  <rect x="220" y="90" width="520" height="360" rx="18" fill="#ffffff" stroke="#d1d5db"/>
+  <text x="480" y="250" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#374151">Screenshot placeholder</text>
+  <text x="480" y="295" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#6b7280">Zigbee2MQTT Composite Card</text>
+</svg>

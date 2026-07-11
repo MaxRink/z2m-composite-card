@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "useDefineForClassFields": false,
+    "skipLibCheck": true,
+    "sourceMap": false,
+    "declaration": false,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

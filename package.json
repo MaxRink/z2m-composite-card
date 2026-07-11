@@ -1,0 +1,34 @@
+{
+  "name": "z2m-composite-card",
+  "version": "0.1.0",
+  "description": "A Home Assistant Lovelace card for atomically editing Zigbee2MQTT composite exposes.",
+  "license": "MIT",
+  "author": "Maximilian Rink",
+  "type": "module",
+  "packageManager": "pnpm@10.13.1",
+  "main": "dist/z2m-composite-card.js",
+  "module": "dist/z2m-composite-card.js",
+  "files": [
+    "dist",
+    "hacs.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "pnpm run typecheck && rollup -c",
+    "typecheck": "tsc --noEmit",
+    "watch": "rollup -c -w"
+  },
+  "dependencies": {
+    "lit": "^3.3.1"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.4",
+    "rollup": "^4.45.0",
+    "tslib": "^2.8.1",
+    "typescript": "^5.8.3"
+  }
+}
