@@ -10,6 +10,8 @@ Zigbee2MQTT composite exposes must be written as one complete object. This card 
 
 It works on stock Home Assistant with only this card installed, but it requires the companion Zigbee2MQTT change that creates a composite sensor entity with the `z2m_composite` attribute.
 
+Any settable composite is supported (the card is fully schema-driven). Verified against the SONOFF smart water valve composites, including the **manual watering** settings (`manual_default_settings`) and the **cyclic timed / quantitative irrigation** composites. For a brand-new/empty composite it seeds every field from the schema (numeric → minimum, enum → first option, binary → off, text → empty) so a complete payload can always be sent.
+
 ## Installation
 
 ### HACS custom repository

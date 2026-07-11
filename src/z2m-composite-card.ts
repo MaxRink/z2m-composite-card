@@ -1,14 +1,22 @@
 import { CSSResultGroup, LitElement, PropertyValues, css, html, nothing } from 'lit';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import {
+  type CompositeRecord,
+  type CompositeValue,
+  type Z2mFeature,
+  type Z2mSchema,
+  binaryOffValue,
+  binaryOnValue,
+  buildDraft,
+  buildPayload,
+  featureKey,
+  isRecord,
+  isSettable,
+  typeDefault,
+  validateSchema,
+} from './composite';
 
-type FeatureType = 'numeric' | 'enum' | 'binary' | 'text' | 'composite' | 'list';
 type PathSegment = string | number;
-
-type CompositePrimitive = string | number | boolean | null;
-type CompositeValue = CompositePrimitive | CompositeRecord | CompositeValue[];
-interface CompositeRecord {
-  [key: string]: CompositeValue | undefined;
-}
 
 interface HomeAssistantEntity {
   state: string;
@@ -18,30 +26,6 @@ interface HomeAssistantEntity {
 interface HomeAssistant {
   states: Record<string, HomeAssistantEntity | undefined>;
   callService(domain: string, service: string, data?: Record<string, unknown>): Promise<unknown>;
-}
-
-interface Z2mFeature {
-  name?: string;
-  property?: string;
-  label?: string;
-  type: FeatureType;
-  access?: number;
-  description?: string;
-  unit?: string;
-  value_min?: number;
-  value_max?: number;
-  value_step?: number;
-  default?: unknown;
-  values?: string[];
-  value_on?: unknown;
-  value_off?: unknown;
-  features?: Z2mFeature[];
-}
-
-interface Z2mSchema {
-  property: string;
-  label?: string;
-  features: Z2mFeature[];
 }
 
 interface Z2mCompositeAttribute {
@@ -74,67 +58,11 @@ interface ErrorContext {
 
 type Context = CardContext | ErrorContext;
 
-const SET_ACCESS = 2;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function featureKey(feature: Z2mFeature): string {
-  return feature.property ?? feature.name ?? 'value';
-}
-
 function stringifyError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
   return String(error);
-}
-
-function validateFeature(value: unknown): Z2mFeature | null {
-  if (!isRecord(value) || typeof value.type !== 'string') {
-    return null;
-  }
-
-  const type = value.type as FeatureType;
-  if (!['numeric', 'enum', 'binary', 'text', 'composite', 'list'].includes(type)) {
-    return null;
-  }
-
-  return {
-    name: typeof value.name === 'string' ? value.name : undefined,
-    property: typeof value.property === 'string' ? value.property : undefined,
-    label: typeof value.label === 'string' ? value.label : undefined,
-    type,
-    access: typeof value.access === 'number' ? value.access : undefined,
-    description: typeof value.description === 'string' ? value.description : undefined,
-    unit: typeof value.unit === 'string' ? value.unit : undefined,
-    value_min: typeof value.value_min === 'number' ? value.value_min : undefined,
-    value_max: typeof value.value_max === 'number' ? value.value_max : undefined,
-    value_step: typeof value.value_step === 'number' ? value.value_step : undefined,
-    default: value.default,
-    values: Array.isArray(value.values) ? value.values.filter((item): item is string => typeof item === 'string') : undefined,
-    value_on: value.value_on,
-    value_off: value.value_off,
-    features: Array.isArray(value.features) ? value.features.map(validateFeature).filter((item): item is Z2mFeature => item !== null) : undefined,
-  };
-}
-
-function validateSchema(value: unknown): Z2mSchema | null {
-  if (!isRecord(value) || typeof value.property !== 'string' || !Array.isArray(value.features)) {
-    return null;
-  }
-
-  const features = value.features.map(validateFeature).filter((item): item is Z2mFeature => item !== null);
-  if (features.length !== value.features.length) {
-    return null;
-  }
-
-  return {
-    property: value.property,
-    label: typeof value.label === 'string' ? value.label : undefined,
-    features,
-  };
 }
 
 export class Z2mCompositeCard extends LitElement {
@@ -736,125 +664,27 @@ export class Z2mCompositeCard extends LitElement {
   }
 
   private _buildDraftObject(features: Z2mFeature[], source: CompositeRecord): CompositeRecord {
-    const draft: CompositeRecord = {};
-    for (const feature of features) {
-      const key = featureKey(feature);
-      draft[key] = this._draftValue(feature, source[key]);
-    }
-    return draft;
-  }
-
-  private _draftValue(feature: Z2mFeature, currentValue: unknown): CompositeValue {
-    if (currentValue !== undefined) {
-      if (feature.type === 'composite') {
-        return this._buildDraftObject(feature.features ?? [], isRecord(currentValue) ? (currentValue as CompositeRecord) : {});
-      }
-      if (feature.type === 'list') {
-        return this._buildDraftList(feature, currentValue);
-      }
-      if (feature.type === 'numeric') {
-        const numberValue = Number(currentValue);
-        return Number.isFinite(numberValue) ? numberValue : (this._typeDefault(feature) as number);
-      }
-      if (feature.type === 'text' || feature.type === 'enum') {
-        return String(currentValue);
-      }
-      if (feature.type === 'binary') {
-        return currentValue === this._binaryOnValue(feature) ? (this._binaryOnValue(feature) as CompositePrimitive) : (this._binaryOffValue(feature) as CompositePrimitive);
-      }
-    }
-
-    if (feature.default !== undefined) {
-      if (feature.type === 'composite') {
-        return this._buildDraftObject(feature.features ?? [], isRecord(feature.default) ? (feature.default as CompositeRecord) : {});
-      }
-      if (feature.type === 'list') {
-        return this._buildDraftList(feature, feature.default);
-      }
-      return feature.default as CompositePrimitive;
-    }
-
-    return this._typeDefault(feature);
-  }
-
-  private _buildDraftList(feature: Z2mFeature, value: unknown): CompositeValue[] {
-    const sourceItems = Array.isArray(value) ? value : [];
-    const firstSource = sourceItems[0];
-    if ((feature.features ?? []).length === 0) {
-      return sourceItems as CompositeValue[];
-    }
-
-    const firstDraft = this._buildDraftObject(feature.features ?? [], isRecord(firstSource) ? (firstSource as CompositeRecord) : {});
-    return [firstDraft, ...(sourceItems.slice(1) as CompositeValue[])];
-  }
-
-  private _typeDefault(feature: Z2mFeature): CompositeValue {
-    switch (feature.type) {
-      case 'numeric':
-        return feature.value_min ?? 0;
-      case 'enum':
-        return feature.values?.[0] ?? '';
-      case 'binary':
-        return this._binaryOffValue(feature) as CompositePrimitive;
-      case 'text':
-        return '';
-      case 'composite':
-        return this._buildDraftObject(feature.features ?? [], {});
-      case 'list':
-        return (feature.features ?? []).length > 0 ? [this._buildDraftObject(feature.features ?? [], {})] : [];
-      default:
-        return '';
-    }
+    return buildDraft(features, source);
   }
 
   private _buildPayloadObject(features: Z2mFeature[], draft: CompositeRecord): CompositeRecord {
-    const payload: CompositeRecord = {};
-    for (const feature of features) {
-      const key = featureKey(feature);
-      payload[key] = this._payloadValue(feature, draft[key]);
-    }
-    return payload;
+    return buildPayload(features, draft);
   }
 
-  private _payloadValue(feature: Z2mFeature, value: unknown): CompositeValue {
-    switch (feature.type) {
-      case 'numeric': {
-        const numberValue = Number(value);
-        return Number.isFinite(numberValue) ? numberValue : (this._typeDefault(feature) as number);
-      }
-      case 'enum': {
-        const textValue = String(value ?? this._typeDefault(feature));
-        return feature.values?.includes(textValue) ? textValue : (this._typeDefault(feature) as string);
-      }
-      case 'binary':
-        return value === this._binaryOnValue(feature) ? (this._binaryOnValue(feature) as CompositePrimitive) : (this._binaryOffValue(feature) as CompositePrimitive);
-      case 'text':
-        return String(value ?? '');
-      case 'composite':
-        return this._buildPayloadObject(feature.features ?? [], isRecord(value) ? (value as CompositeRecord) : {});
-      case 'list': {
-        const items = Array.isArray(value) ? value : [];
-        if ((feature.features ?? []).length === 0) {
-          return items as CompositeValue[];
-        }
-        const firstItem = this._buildPayloadObject(feature.features ?? [], isRecord(items[0]) ? (items[0] as CompositeRecord) : {});
-        return [firstItem, ...(items.slice(1) as CompositeValue[])];
-      }
-      default:
-        return '';
-    }
+  private _typeDefault(feature: Z2mFeature): CompositeValue {
+    return typeDefault(feature);
   }
 
   private _binaryOnValue(feature: Z2mFeature): unknown {
-    return feature.value_on ?? true;
+    return binaryOnValue(feature);
   }
 
   private _binaryOffValue(feature: Z2mFeature): unknown {
-    return feature.value_off ?? false;
+    return binaryOffValue(feature);
   }
 
   private _isSettable(feature: Z2mFeature): boolean {
-    return feature.access === undefined || (feature.access & SET_ACCESS) === SET_ACCESS;
+    return isSettable(feature);
   }
 
   private _getDraftValue(path: PathSegment[]): unknown {

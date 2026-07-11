@@ -11,17 +11,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
+
+      - name: Test
+        run: corepack pnpm run test
 
       - name: Build
         run: corepack pnpm run build
